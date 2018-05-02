@@ -3,9 +3,9 @@ const morgan = require('morgan');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const config = require('./api/config/config');
+const itemMasterRoutes = require('./api/routes/itemMasterController');
+const regionalItemRoutes = require('./api/routes/regionalItemController');
 
-const productRoutes = require('./api/routes/products');
-const orderRoutes = require('./api/routes/orders');
 const app = express();
 
 //MongoDb connection
@@ -29,9 +29,8 @@ app.use((req,res,next)=> {
     next();
 });
 
-app.use('/products',productRoutes);
-app.use('/orders',orderRoutes);
-
+app.use('/products',itemMasterRoutes);
+app.use('/regionalItem',regionalItemRoutes);
 app.use((req,res,next) => {
     const error = new Error("Not Found!");
     error.status = 404;
