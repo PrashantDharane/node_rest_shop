@@ -4,13 +4,14 @@ const regionalItemService = require('../services/regionalItemService');
 const regionalCatalogService = require('../services/regionalCatlogService');
 const sellerItemService = require('../services/sellerItemService');
 const itemMasterService = require('../services/itemMasterService');
+const hierarchyService = require('../services/regionalCategoryHierarchy/regionalCategoryHierarchy');
+const RegionalCategoryHierarchyPreProcessor = require('../services/regionalCategoryHierarchy/regionalCategoryHierarchyProcessor');
 const mongoose = require('mongoose');
 const router = express.Router();
 
 
 router.post('/feature-items',(req,res,next) => {
     const requestData = req.body;
-    // {"categories":["200000000000000000"],"sub-categories":["203000000000000000"],"country":"IN","region":"MH","orgId":"ITZZBRAND"}
     const categories = requestData.categories;
     const subCategories = requestData['sub-categories'];
     const region = requestData.region;
@@ -19,59 +20,10 @@ router.post('/feature-items',(req,res,next) => {
     const tags = requestData.tags;
     const limit = requestData.limit;
 
-    regionalCatalogService
-        .findCatlogs(categories,subCategories,region,orgId,country)
-        .then(catlogs => {
-            
-            const catlogIds = [];
-            const regionalItemIds = [];
-            const regionalItemMap = {};
-            const itemMasterIds = [];
-            const itemMasterMap = {};
-            const sellerItemMap = {};
-
-            catlogs.forEach(catlog => {
-                catlogIds.push(catlog._id);
-            });
-            regionalItemService.findRegionalItemsBySubCategory(catlogIds,subCategories,tags,limit)
-                .then( regItems => {
-                    regItems.forEach(element => {
-                        regionalItemMap[element._id] = element;
-                        regionalItemIds.push(element._id);
-                        itemMasterIds.push(element.item_master_id);
-                    });
-
-                    itemMasterService
-                        .findListByIds(itemMasterIds,orgId).then(masterItems => {
-                            masterItems.forEach(element => {
-                                itemMasterMap[element._id] = element;
-                            });
-                            
-                            sellerItemService.findSellerItems(regionalItemIds,limit).then(sellerItem => {
-                                sellerItem.forEach(element => {
-                                    sellerItemMap[element.regional_item_id] = element;                                                                                
-                                });
-                                const finalResult = [];
-                                regItems.forEach(element => {
-                                    let record = element.toObject();
-                                    record['itemMasterData'] = itemMasterMap[element.item_master_id];
-                                    record['sellerData'] = sellerItemMap[element._id];
-                                                                       
-                                    finalResult.push(record);
-                                });
-                                res.status(200).json(finalResult);
-                            })
-                            .catch(err => {
-                                res.status(500).json(err);
-                            });
-                        })
-                        .catch(err => {
-                            res.status(500).json(err);
-                        });
-                })
-                .catch(err => {
-                    res.status(500).json(err);
-                });
+    new regionalCatalogService()
+        .featureItem(categories,subCategories,region,orgId,country,tags)
+        .then(result => {
+            res.status(200).json(result);
         })
         .catch(err => {
             res.status(500).json(err);
@@ -104,4 +56,12 @@ router.post('/',(req,res,next) => {
         });
 });
 
+router.get('/hierarchy',(req,res,next) => {
+    new hierarchyService().find()
+        .then(doc => {
+            const processor = new RegionalCategoryHierarchyPreProcessor(doc[0].toObject());
+            
+            res.status(200).json(processor.getHierarchyWithMetadata());
+        });
+});
 module.exports = router;
